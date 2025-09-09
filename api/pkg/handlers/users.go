@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"cinelume/api/internal/models"
+	"cinelume/api/pkg/models"
 
 	"github.com/cloudinary/cloudinary-go/v2/api"
 	"github.com/gin-gonic/gin"

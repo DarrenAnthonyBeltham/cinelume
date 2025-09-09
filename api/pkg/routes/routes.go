@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"os"
 
-	"cinelume/api/internal/handlers"
-	"cinelume/api/internal/middleware"
+	"cinelume/api/pkg/handlers"
+	"cinelume/api/pkg/middleware"
 
 	"github.com/gin-gonic/gin"
 )

@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"sync"
 
-	"cinelume/api/internal/database"
-	"cinelume/api/internal/routes"
+	"cinelume/api/pkg/database"
+	"cinelume/api/pkg/routes"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
