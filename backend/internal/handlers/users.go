@@ -3,10 +3,13 @@ package handlers
 import (
 	"database/sql"
 	"net/http"
+	"net/url"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/DarrenAnthonyBeltham/cinelume/backend/internal/models"
+	"github.com/cloudinary/cloudinary-go/v2/api"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
@@ -53,8 +56,8 @@ func (h *UserHandler) Login(c *gin.Context) {
 	}
 
 	var user models.User
-	query := `SELECT id, username, email, password_hash FROM users WHERE email = $1`
-	err := h.DB.QueryRow(query, payload.Email).Scan(&user.ID, &user.Username, &user.Email, &user.PasswordHash)
+	query := `SELECT id, username, email, password_hash, profile_picture_url FROM users WHERE email = $1`
+	err := h.DB.QueryRow(query, payload.Email).Scan(&user.ID, &user.Username, &user.Email, &user.PasswordHash, &user.ProfilePictureURL)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
@@ -67,9 +70,10 @@ func (h *UserHandler) Login(c *gin.Context) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub": user.ID,
+		"sub":      user.ID,
 		"username": user.Username,
-		"exp": time.Now().Add(time.Hour * 24 * 7).Unix(), 
+		"pfp":      user.ProfilePictureURL,
+		"exp":      time.Now().Add(time.Hour * 24 * 7).Unix(),
 	})
 
 	tokenString, err := token.SignedString([]byte(os.Getenv("JWT_SECRET")))
@@ -79,6 +83,49 @@ func (h *UserHandler) Login(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"token": tokenString})
+}
+
+func (h *UserHandler) UpdateProfile(c *gin.Context) {
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in token"})
+		return
+	}
+
+	var payload models.UpdateProfilePayload
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	query := `
+		UPDATE users 
+		SET username = $1, email = $2, description = $3, profile_picture_url = $4
+		WHERE id = $5
+	`
+	_, err := h.DB.Exec(query, payload.Username, payload.Email, payload.Description, payload.ProfilePictureURL, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
+		return
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"sub":      userID,
+		"username": payload.Username,
+		"pfp":      payload.ProfilePictureURL,
+		"exp":      time.Now().Add(time.Hour * 24 * 7).Unix(),
+	})
+
+	tokenString, err := token.SignedString([]byte(os.Getenv("JWT_SECRET")))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create new token"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Profile updated successfully",
+		"token":   tokenString,
+	})
 }
 
 func (h *UserHandler) GetProfile(c *gin.Context) {
@@ -98,38 +145,6 @@ func (h *UserHandler) GetProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
-func (h *UserHandler) UpdateProfile(c *gin.Context) {
-	userID, exists := c.Get("userID")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in token"})
-		return
-	}
-	
-	var payload models.UpdateProfilePayload
-	if err := c.ShouldBindJSON(&payload); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	
-	query := `
-		UPDATE users 
-		SET username = $1, email = $2, description = $3, profile_picture_url = $4
-		WHERE id = $5
-	`
-	_, err := h.DB.Exec(query, payload.Username, payload.Email, payload.Description, payload.ProfilePictureURL, userID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Profile updated successfully"})
-}
-
-type UpdatePasswordPayload struct {
-	CurrentPassword string `json:"currentPassword" binding:"required"`
-	NewPassword     string `json:"newPassword" binding:"required,min=8"`
-}
-
 func (h *UserHandler) UpdatePassword(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
@@ -137,7 +152,7 @@ func (h *UserHandler) UpdatePassword(c *gin.Context) {
 		return
 	}
 
-	var payload UpdatePasswordPayload
+	var payload models.UpdatePasswordPayload
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -171,4 +186,26 @@ func (h *UserHandler) UpdatePassword(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Password updated successfully"})
+}
+
+func (h *UserHandler) GetUploadSignature(c *gin.Context) {
+	apiKey := os.Getenv("CLOUDINARY_API_KEY")
+	apiSecret := os.Getenv("CLOUDINARY_API_SECRET")
+
+	timestamp := time.Now().Unix()
+	
+	params := url.Values{}
+	params.Set("timestamp", strconv.FormatInt(timestamp, 10))
+
+	signature, err := api.SignParameters(params, apiSecret)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to sign params"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"signature": signature,
+		"timestamp": timestamp,
+		"apiKey":    apiKey,
+	})
 }

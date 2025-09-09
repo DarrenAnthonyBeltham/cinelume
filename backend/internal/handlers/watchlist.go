@@ -51,10 +51,13 @@ func (h *WatchlistHandler) GetWatchlist(c *gin.Context) {
 	userID, _ := c.Get("userID")
 
 	query := `
-		SELECT id, media_id, media_type, title, poster_path, status, added_at 
-		FROM watchlist_items 
-		WHERE user_id = $1 
-		ORDER BY added_at DESC
+		SELECT 
+			wi.id, wi.media_id, wi.media_type, wi.title, wi.poster_path, wi.status, wi.added_at,
+			COALESCE(r.rating, 0) as user_rating
+		FROM watchlist_items wi
+		LEFT JOIN reviews r ON wi.user_id = r.user_id AND wi.media_id = r.media_id AND wi.media_type = r.media_type
+		WHERE wi.user_id = $1 
+		ORDER BY wi.added_at DESC
 	`
 	rows, err := h.DB.Query(query, userID)
 	if err != nil {
@@ -73,8 +76,9 @@ func (h *WatchlistHandler) GetWatchlist(c *gin.Context) {
 			PosterPath string
 			Status     string
 			AddedAt    string
+			UserRating int
 		}
-		if err := rows.Scan(&item.ID, &item.MediaID, &item.MediaType, &item.Title, &item.PosterPath, &item.Status, &item.AddedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.MediaID, &item.MediaType, &item.Title, &item.PosterPath, &item.Status, &item.AddedAt, &item.UserRating); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan watchlist item"})
 			return
 		}
@@ -86,6 +90,7 @@ func (h *WatchlistHandler) GetWatchlist(c *gin.Context) {
 			"posterPath": item.PosterPath,
 			"status":     item.Status,
 			"addedAt":    item.AddedAt,
+			"rating":     item.UserRating,
 		})
 	}
 

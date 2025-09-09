@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/app/context/AuthContext';
 import api from '@/lib/api';
-import axios from 'axios';
+import Image from 'next/image';
+import Link from 'next/link';
 
 interface WatchlistStat {
   status: string;
@@ -23,9 +24,11 @@ export default function ProfilePage() {
   const router = useRouter();
   const username = params.username as string;
   const { user: loggedInUser, updateUser: updateAuthUser } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [profileUser, setProfileUser] = useState<any>(null);
   const [stats, setStats] = useState<UserStats | null>(null);
+  const [latestReviews, setLatestReviews] = useState<any[]>([]);
   const [isOwner, setIsOwner] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -33,6 +36,7 @@ export default function ProfilePage() {
   const [editableUsername, setEditableUsername] = useState('');
   const [editableEmail, setEditableEmail] = useState('');
   const [editableDescription, setEditableDescription] = useState('');
+  const [editableProfilePic, setEditableProfilePic] = useState('');
 
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
@@ -46,8 +50,13 @@ export default function ProfilePage() {
     const fetchProfileData = async () => {
       setLoading(true);
       try {
-        const statsRes = await axios.get(`http://localhost:8080/api/users/${username}/stats`);
+        const [statsRes, reviewsRes] = await Promise.all([
+          api.get(`/users/${username}/stats`),
+          api.get(`/users/${username}/reviews`)
+        ]);
+        
         setStats(statsRes.data);
+        setLatestReviews(reviewsRes.data);
 
         if (loggedInUser && loggedInUser.username === username) {
           const profileRes = await api.get('/users/profile');
@@ -55,9 +64,11 @@ export default function ProfilePage() {
           setEditableUsername(profileRes.data.username);
           setEditableEmail(profileRes.data.email);
           setEditableDescription(profileRes.data.description || '');
+          setEditableProfilePic(profileRes.data.profilePictureUrl || '');
+        } else {
+          setEditableUsername(username);
         }
       } catch (err) {
-        console.error('Failed to load profile data.');
       } finally {
         setLoading(false);
       }
@@ -65,28 +76,45 @@ export default function ProfilePage() {
     fetchProfileData();
   }, [username, loggedInUser]);
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const { data: { signature, timestamp, apiKey } } = await api.get('/users/upload-signature');
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('api_key', apiKey);
+      formData.append('timestamp', timestamp);
+      formData.append('signature', signature);
+      const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`;
+      const cloudinaryRes = await fetch(cloudinaryUrl, { method: 'POST', body: formData });
+      const cloudinaryData = await cloudinaryRes.json();
+      setEditableProfilePic(cloudinaryData.secure_url);
+    } catch (error) {
+    }
+  };
+
   const handleSaveChanges = async () => {
     try {
       const payload = {
         username: editableUsername,
         email: editableEmail,
         description: editableDescription,
-        profilePictureUrl: profileUser.profilePictureUrl || ''
+        profilePictureUrl: editableProfilePic,
       };
-      await api.put('/users/profile', payload);
-      
+      const response = await api.put('/users/profile', payload);
+      if (response.data.token) {
+        localStorage.setItem('token', response.data.token);
+      }
       setProfileUser((prev: any) => ({ ...prev, ...payload }));
       if (updateAuthUser && loggedInUser) {
-        updateAuthUser({ username: editableUsername, sub: loggedInUser.sub });
+        updateAuthUser({ username: editableUsername, sub: loggedInUser.sub, pfp: editableProfilePic });
       }
-      
       setIsEditing(false);
-      
       if (username !== editableUsername) {
         router.push(`/profile/${editableUsername}`);
       }
     } catch (error) {
-      console.error("Failed to save profile", error);
     }
   };
   
@@ -110,16 +138,36 @@ export default function ProfilePage() {
   };
 
   if (loading) return <div className="text-center p-10">Loading profile...</div>;
+  
+  const joinedDate = profileUser?.createdAt 
+    ? new Date(profileUser.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) 
+    : '';
+
+  const displayProfilePic = isEditing ? editableProfilePic : profileUser?.profilePictureUrl;
 
   return (
     <>
       <div className="container mx-auto p-4 md:p-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          <div className="md:col-span-1">
-            <div className="bg-gray-800 p-4 rounded-lg text-center">
-              <div className="w-32 h-32 bg-gray-700 rounded-full mx-auto mb-4"></div>
+          <div className="md:col-span-1 self-start">
+            <div className="bg-gray-800 p-4 rounded-lg text-center sticky top-24">
+              <div className="relative w-32 h-32 bg-gray-700 rounded-full mx-auto mb-4 group">
+                <Image
+                  src={displayProfilePic || '/default-avatar.png'}
+                  alt={username}
+                  fill
+                  sizes="128px"
+                  className="rounded-full object-cover"
+                />
+                {isEditing && (
+                  <div onClick={() => fileInputRef.current?.click()} className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-sm rounded-full cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity">
+                    Change
+                  </div>
+                )}
+              </div>
+              <input type="file" ref={fileInputRef} onChange={handleImageUpload} className="hidden" accept="image/png, image/jpeg, image/gif"/>
               <h1 className="text-2xl font-bold break-words">{username}'s Profile</h1>
-              <p className="text-sm text-gray-400 mt-2">Joined: {/* Date here */}</p>
+              {joinedDate && <p className="text-sm text-gray-400 mt-2">Joined: {joinedDate}</p>}
               {isOwner && !isEditing && (
                 <div className="mt-4 space-y-2">
                   <button onClick={() => setIsEditing(true)} className="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded">Edit Profile</button>
@@ -128,10 +176,9 @@ export default function ProfilePage() {
               )}
             </div>
           </div>
-
           <div className="md:col-span-3">
             {isEditing ? (
-              <form onSubmit={(e) => { e.preventDefault(); handleSaveChanges(); }} className="space-y-6">
+              <form onSubmit={(e) => { e.preventDefault(); handleSaveChanges(); }} className="space-y-6 bg-gray-800 p-6 rounded-lg">
                 <div>
                   <label className="block text-gray-300 mb-2">Username</label>
                   <input type="text" value={editableUsername} onChange={(e) => setEditableUsername(e.target.value)} className="w-full bg-gray-700 p-2 rounded-md"/>
@@ -142,11 +189,15 @@ export default function ProfilePage() {
                 </div>
                 <div>
                   <label className="block text-gray-300 mb-2">Description</label>
-                  <textarea value={editableDescription} onChange={(e) => setEditableDescription(e.target.value)} rows={4} className="w-full bg-gray-800 p-3 rounded-md"/>
+                  <textarea value={editableDescription} onChange={(e) => setEditableDescription(e.target.value)} rows={4} className="w-full bg-gray-700 p-3 rounded-md"/>
+                </div>
+                <div className="flex items-center space-x-4 pt-4">
+                  <button type="submit" className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-6 rounded">Save Changes</button>
+                  <button type="button" onClick={() => setIsEditing(false)} className="bg-gray-600 hover:bg-gray-700 text-white py-2 px-6 rounded">Cancel</button>
                 </div>
               </form>
             ) : (
-              <p className="mb-6 text-gray-300">{editableDescription || 'No description provided.'}</p>
+              <p className="mb-6 text-gray-300 h-24">{profileUser?.description || 'No description provided.'}</p>
             )}
 
             <div className="bg-gray-800 p-6 rounded-lg my-8">
@@ -168,12 +219,23 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {isEditing && (
-              <div className="flex items-center space-x-4">
-                <button onClick={handleSaveChanges} className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-6 rounded">Save Changes</button>
-                <button onClick={() => setIsEditing(false)} className="bg-gray-600 hover:bg-gray-700 text-white py-2 px-6 rounded">Cancel</button>
+            <div className="bg-gray-800 p-6 rounded-lg my-8">
+              <h2 className="text-xl font-bold mb-4">Latest Reviews</h2>
+              <div className="space-y-4">
+                {latestReviews.map(review => (
+                  <Link href={`/${review.mediaType}/${review.mediaId}`} key={review.id} className="block p-4 bg-gray-900/50 rounded-lg hover:bg-gray-700/50 transition-colors">
+                    <div className="flex-grow">
+                        <p className="font-bold">{review.mediaTitle}</p>
+                        <div className="flex items-center text-yellow-400 text-sm my-1">
+                            <span className="font-bold mr-1">{review.rating}</span><span>★</span>
+                        </div>
+                        <p className="text-gray-300 italic text-sm">"{review.comment}"</p>
+                    </div>
+                  </Link>
+                ))}
+                {latestReviews.length === 0 && <p className="text-gray-400">No reviews yet.</p>}
               </div>
-            )}
+            </div>
           </div>
         </div>
       </div>

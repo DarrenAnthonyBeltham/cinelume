@@ -74,3 +74,49 @@ func (h *StatsHandler) GetUserStats(c *gin.Context) {
 
 	c.JSON(http.StatusOK, stats)
 }
+
+func (h *StatsHandler) GetUserReviews(c *gin.Context) {
+	username := c.Param("username")
+	
+	query := `
+		SELECT r.id, r.media_id, r.media_type, r.media_title, r.media_poster_path, r.rating, r.comment, r.created_at
+		FROM reviews r
+		JOIN users u ON r.user_id = u.id
+		WHERE u.username = $1
+		ORDER BY r.created_at DESC
+		LIMIT 10
+	`
+	rows, err := h.DB.Query(query, username)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch reviews"})
+		return
+	}
+	defer rows.Close()
+
+	var reviews []gin.H
+	for rows.Next() {
+		var review struct {
+			ID int
+			MediaID int
+			MediaType string
+			MediaTitle string
+			MediaPosterPath sql.NullString
+			Rating int
+			Comment string
+			CreatedAt string
+		}
+		rows.Scan(&review.ID, &review.MediaID, &review.MediaType, &review.MediaTitle, &review.MediaPosterPath, &review.Rating, &review.Comment, &review.CreatedAt)
+		reviews = append(reviews, gin.H{
+			"id": review.ID,
+			"mediaId": review.MediaID,
+			"mediaType": review.MediaType,
+			"mediaTitle": review.MediaTitle,
+			"mediaPosterPath": review.MediaPosterPath.String,
+			"rating": review.Rating,
+			"comment": review.Comment,
+			"createdAt": review.CreatedAt,
+		})
+	}
+
+	c.JSON(http.StatusOK, reviews)
+}

@@ -3,6 +3,7 @@ module github.com/DarrenAnthonyBeltham/cinelume/backend
 go 1.24.1
 
 require (
+	github.com/cloudinary/cloudinary-go/v2 v2.13.0
 	github.com/gin-gonic/gin v1.10.1
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/jackc/pgx/v5 v5.7.5

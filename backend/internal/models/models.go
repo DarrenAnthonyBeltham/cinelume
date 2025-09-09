@@ -7,8 +7,8 @@ type User struct {
 	Username          string    `json:"username"`
 	Email             string    `json:"email"`
 	PasswordHash      string    `json:"-"`
-	ProfilePictureURL *string   `json:"profilePictureUrl"` 
-	Description       *string   `json:"description"`      
+	ProfilePictureURL *string   `json:"profilePictureUrl"`
+	Description       *string   `json:"description"`
 	CreatedAt         time.Time `json:"createdAt"`
 }
 
@@ -28,4 +28,9 @@ type UpdateProfilePayload struct {
 	Email             string `json:"email" binding:"required,email"`
 	Description       string `json:"description"`
 	ProfilePictureURL string `json:"profilePictureUrl"`
+}
+
+type UpdatePasswordPayload struct {
+	CurrentPassword string `json:"currentPassword" binding:"required"`
+	NewPassword     string `json:"newPassword" binding:"required,min=8"`
 }

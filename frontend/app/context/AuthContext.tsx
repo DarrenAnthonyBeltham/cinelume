@@ -3,10 +3,12 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { jwtDecode } from 'jwt-decode';
+import api from '@/lib/api';
 
 interface User {
   sub: number; 
   username: string;
+  pfp: string;
 }
 
 interface AuthContextType {
@@ -29,8 +31,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const storedToken = localStorage.getItem('token');
     if (storedToken) {
       try {
-        const decoded: { sub: number; username: string } = jwtDecode(storedToken);
-        setUser({ sub: decoded.sub, username: decoded.username });
+        const decoded: { sub: number; username: string; pfp: string } = jwtDecode(storedToken);
+        setUser({ sub: decoded.sub, username: decoded.username, pfp: decoded.pfp });
         setToken(storedToken);
       } catch (error) {
         localStorage.removeItem('token');
@@ -39,32 +41,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (data: any) => {
-    const res = await fetch('http://localhost:8080/api/users/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-
-    if (res.ok) {
-      const { token } = await res.json();
+    const response = await api.post('/users/login', data);
+    if (response.status === 200) {
+      const { token } = response.data;
       localStorage.setItem('token', token);
-      const decoded: { sub: number; username: string } = jwtDecode(token);
-      setUser({ sub: decoded.sub, username: decoded.username }); 
+      const decoded: { sub: number; username: string; pfp: string } = jwtDecode(token);
+      setUser({ sub: decoded.sub, username: decoded.username, pfp: decoded.pfp }); 
       setToken(token);
       router.push('/');
     } else {
       throw new Error('Login failed');
     }
   };
+  
+  const updateUser = (newUserData: Partial<User>) => {
+    setUser(prevUser => {
+      if (!prevUser) return null;
+      const updatedUser = { ...prevUser, ...newUserData };
+      
+      const newStoredToken = localStorage.getItem('token');
+      if (newStoredToken) {
+          const decoded: { sub: number; username: string; pfp: string } = jwtDecode(newStoredToken);
+          updatedUser.pfp = decoded.pfp;
+      }
+      return updatedUser;
+    });
+  };
 
   const register = async (data: any) => {
-    const res = await fetch('http://localhost:8080/api/users/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-    });
-
-    if (res.ok) {
+    const response = await api.post('/users/register', data);
+    if (response.status === 201) {
         router.push('/login');
     } else {
         throw new Error('Registration failed');
@@ -76,10 +82,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setToken(null);
     router.push('/');
-  };
-
-  const updateUser = (newUserData: Partial<User>) => {
-    setUser(prevUser => prevUser ? { ...prevUser, ...newUserData } : null);
   };
 
   return (
