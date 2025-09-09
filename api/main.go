@@ -2,31 +2,33 @@ package main
 
 import (
 	"log"
-	"os"
+	"net/http"
+	"sync"
 
 	"cinelume/api/internal/database"
 	"cinelume/api/internal/routes"
 
+	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
 
-func main() {
+var (
+	router *gin.Engine
+	once   sync.Once
+)
+
+func setupRouter() *gin.Engine {
 	if err := godotenv.Load(); err != nil {
 		log.Println("Warning: .env file not found")
 	}
-
 	db := database.Connect()
-	defer db.Close()
+	r := routes.SetupRoutes(db)
+	return r
+}
 
-	router := routes.SetupRoutes(db)
-
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-
-	log.Printf("🚀 Server starting on http://localhost:%s", port)
-	if err := router.Run(":" + port); err != nil {
-		log.Fatalf("Failed to run server: %v", err)
-	}
+func Handler(w http.ResponseWriter, r *http.Request) {
+	once.Do(func() {
+		router = setupRouter()
+	})
+	router.ServeHTTP(w, r)
 }
