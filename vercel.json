@@ -1,18 +1,8 @@
 {
   "builds": [
     {
-      "src": "api/main.go",
-      "use": "@vercel/go"
-    },
-    {
       "src": "frontend/package.json",
       "use": "@vercel/next"
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/main.go"
     }
   ]
 }
