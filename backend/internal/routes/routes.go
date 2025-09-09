@@ -4,8 +4,9 @@ import (
 	"database/sql"
 	"os"
 
-	"github.com/DarrenAnthonyBeltham/cinelume/backend/internal/handlers"
-	"github.com/DarrenAnthonyBeltham/cinelume/backend/internal/middleware"
+	"cinelume/api/internal/handlers"
+	"cinelume/api/internal/middleware"
+
 	"github.com/gin-gonic/gin"
 )
 

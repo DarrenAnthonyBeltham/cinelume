@@ -8,7 +8,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/DarrenAnthonyBeltham/cinelume/backend/internal/models"
+	"cinelume/api/internal/models"
+
 	"github.com/cloudinary/cloudinary-go/v2/api"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"

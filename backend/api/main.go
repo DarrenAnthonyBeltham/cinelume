@@ -4,8 +4,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/DarrenAnthonyBeltham/cinelume/backend/internal/database"
-	"github.com/DarrenAnthonyBeltham/cinelume/backend/internal/routes"
+	"cinelume/api/internal/database"
+	"cinelume/api/internal/routes"
+
 	"github.com/joho/godotenv"
 )
 

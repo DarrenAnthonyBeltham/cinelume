@@ -1,4 +1,4 @@
-module github.com/DarrenAnthonyBeltham/cinelume/backend
+module cinelume/api
 
 go 1.24.1
 
