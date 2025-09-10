@@ -1,12 +1,13 @@
 {
-  "builds": [
+  "functions": {
+    "api/main.go": {
+      "runtime": "vercel-go@1.0.0"
+    }
+  },
+  "rewrites": [
     {
-      "src": "api/main.go",
-      "use": "@vercel/go"
-    },
-    {
-      "src": "frontend/package.json",
-      "use": "@vercel/next"
+      "source": "/api/:path*",
+      "destination": "/api/main.go"
     }
   ]
 }
