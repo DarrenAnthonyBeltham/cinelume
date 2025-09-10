@@ -6,7 +6,6 @@ import (
 
 	"cinelume/api/pkg/handlers"
 	"cinelume/api/pkg/middleware"
-
 	"github.com/gin-gonic/gin"
 )
 
@@ -23,44 +22,41 @@ func SetupRoutes(db *sql.DB) *gin.Engine {
 	tvHandler := handlers.NewTvHandler(db)
 	searchHandler := handlers.NewSearchHandler()
 
-	api := router.Group("/api")
+	router.GET("/search", searchHandler.Search)
+
+	router.GET("/movie/:id", movieHandler.GetMovieDetails)
+	router.GET("/tv/:id", tvHandler.GetTvDetails)
+
+	router.POST("/users/register", userHandler.Register)
+	router.POST("/users/login", userHandler.Login)
+	router.GET("/users/:username/stats", statsHandler.GetUserStats)
+	router.GET("/users/:username/reviews", statsHandler.GetUserReviews)
+
+	router.GET("/movies/popular", tmdbHandler.Proxy("movie/popular"))
+	router.GET("/movies/top_rated", tmdbHandler.Proxy("movie/top_rated"))
+	router.GET("/movies/upcoming", tmdbHandler.Proxy("movie/upcoming"))
+	router.GET("/genres/movie", tmdbHandler.Proxy("genre/movie/list"))
+	
+	router.GET("/tv/popular", tmdbHandler.Proxy("tv/popular"))
+	router.GET("/tv/top_rated", tmdbHandler.Proxy("tv/top_rated"))
+	router.GET("/genres/tv", tmdbHandler.Proxy("genre/tv/list"))
+
+	router.GET("/trending/all/day", tmdbHandler.Proxy("trending/all/day"))
+
+	protected := router.Group("/")
+	protected.Use(middleware.AuthMiddleware())
 	{
-		api.GET("/search", searchHandler.Search)
+		protected.GET("/users/profile", userHandler.GetProfile)
+		protected.PUT("/users/profile", userHandler.UpdateProfile)
+		protected.PUT("/users/password", userHandler.UpdatePassword)
+		protected.GET("/users/upload-signature", userHandler.GetUploadSignature)
 
-		api.GET("/movie/:id", movieHandler.GetMovieDetails)
-		api.GET("/tv/:id", tvHandler.GetTvDetails)
+		protected.POST("/watchlist", watchlistHandler.AddItem)
+		protected.GET("/watchlist", watchlistHandler.GetWatchlist)
+		protected.DELETE("/watchlist/:id", watchlistHandler.RemoveItem)
 
-		api.POST("/users/register", userHandler.Register)
-		api.POST("/users/login", userHandler.Login)
-		api.GET("/users/:username/stats", statsHandler.GetUserStats)
-		api.GET("/users/:username/reviews", statsHandler.GetUserReviews)
-
-		api.GET("/movies/popular", tmdbHandler.Proxy("movie/popular"))
-		api.GET("/movies/top_rated", tmdbHandler.Proxy("movie/top_rated"))
-		api.GET("/movies/upcoming", tmdbHandler.Proxy("movie/upcoming"))
-		api.GET("/genres/movie", tmdbHandler.Proxy("genre/movie/list"))
-
-		api.GET("/tv/popular", tmdbHandler.Proxy("tv/popular"))
-		api.GET("/tv/top_rated", tmdbHandler.Proxy("tv/top_rated"))
-		api.GET("/genres/tv", tmdbHandler.Proxy("genre/tv/list"))
-
-		api.GET("/trending/all/day", tmdbHandler.Proxy("trending/all/day"))
-
-		protected := api.Group("/")
-		protected.Use(middleware.AuthMiddleware())
-		{
-			protected.GET("/users/profile", userHandler.GetProfile)
-			protected.PUT("/users/profile", userHandler.UpdateProfile)
-			protected.PUT("/users/password", userHandler.UpdatePassword)
-			protected.GET("/users/upload-signature", userHandler.GetUploadSignature)
-
-			protected.POST("/watchlist", watchlistHandler.AddItem)
-			protected.GET("/watchlist", watchlistHandler.GetWatchlist)
-			protected.DELETE("/watchlist/:id", watchlistHandler.RemoveItem)
-
-			protected.POST("/reviews", reviewHandler.AddReview)
-			protected.PUT("/reviews/:id", reviewHandler.UpdateReview)
-		}
+		protected.POST("/reviews", reviewHandler.AddReview)
+		protected.PUT("/reviews/:id", reviewHandler.UpdateReview)
 	}
 
 	return router
