@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"log"
 	"net/http"
 	"sync"
 
@@ -18,17 +17,12 @@ var (
 )
 
 func setupRouter() *gin.Engine {
-	if err := godotenv.Load(); err != nil {
-		log.Println("Warning: .env file not found")
-	}
+	_ = godotenv.Load(".env", ".env.local")
 	db := database.Connect()
-	r := routes.SetupRoutes(db)
-	return r
+	return routes.SetupRoutes(db)
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	once.Do(func() {
-		router = setupRouter()
-	})
+	once.Do(func() { router = setupRouter() })
 	router.ServeHTTP(w, r)
 }
