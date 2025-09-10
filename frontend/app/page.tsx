@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Carousel from './components/Carousel';
-import api from '@/lib/api';
 import { motion } from 'framer-motion';
 import { Movie } from './types';
 
@@ -36,14 +35,14 @@ export default function HomePage() {
     const fetchData = async () => {
       try {
         const [popularRes, topRatedRes, trendingRes] = await Promise.all([
-          api.get('/movies/popular'),
-          api.get('/tv/top_rated'),
-          api.get('/trending/all/day'),
+          fetch('/api/movies/popular').then(r => r.json()),
+          fetch('/api/tv/top_rated').then(r => r.json()),
+          fetch('/api/trending/all/day').then(r => r.json()),
         ]);
         setData({
-          popular: popularRes.data.results,
-          topRated: topRatedRes.data.results,
-          trending: trendingRes.data.results,
+          popular: popularRes.results || [],
+          topRated: topRatedRes.results || [],
+          trending: trendingRes.results || [],
         });
       } finally {
         setLoading(false);

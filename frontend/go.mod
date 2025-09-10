@@ -1,6 +1,6 @@
 module github.com/DarrenAnthonyBeltham/cinelume
 
-go 1.23.0
+go 1.22
 
 require (
 	github.com/cloudinary/cloudinary-go/v2 v2.13.0
